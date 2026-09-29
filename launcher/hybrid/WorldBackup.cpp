@@ -184,6 +184,7 @@ QStringList backupChangedWorlds(const QString& savesDir, const QString& instance
 bool restoreBackup(const QString& backupZip, const QString& savesDir, const QString& worldFolderName, QString* error)
 {
     const QString worldPath = FS::PathCombine(savesDir, worldFolderName);
+    const QString extractRoot = QFileInfo(savesDir).canonicalFilePath();
 
     // Keep the current world around instead of deleting it
     QString aside;
@@ -198,7 +199,7 @@ bool restoreBackup(const QString& backupZip, const QString& savesDir, const QStr
         }
     }
 
-    if (!MMCZip::extractDir(backupZip, savesDir)) {
+    if (!MMCZip::extractDir(backupZip, extractRoot.isEmpty() ? savesDir : extractRoot)) {
         // put the original world back so the player is no worse off
         if (!aside.isEmpty()) {
             FS::deletePath(worldPath);

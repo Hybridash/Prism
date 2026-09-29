@@ -181,8 +181,12 @@ QStringList backupChangedWorlds(const QString& savesDir, const QString& instance
     return log;
 }
 
-bool restoreBackup(const QString& backupZip, const QString& savesDir, const QString& worldFolderName, QString* error)
+bool restoreBackup(const QString& backupZip, const QString& savesDirIn, const QString& worldFolderName, QString* error)
 {
+    // libarchive refuses to extract "through" a symlink, so resolve them first
+    // (e.g. /var -> /private/var on macOS, or a symlinked instances folder)
+    const QString canonical = QFileInfo(savesDirIn).canonicalFilePath();
+    const QString savesDir = canonical.isEmpty() ? savesDirIn : canonical;
     const QString worldPath = FS::PathCombine(savesDir, worldFolderName);
 
     // Keep the current world around instead of deleting it

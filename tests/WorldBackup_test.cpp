@@ -4,6 +4,7 @@
 #include <QTemporaryDir>
 #include <QTest>
 #include <QThread>
+#include <filesystem>
 
 #include <FileSystem.h>
 #include <hybrid/WorldBackup.h>
@@ -61,6 +62,39 @@ class WorldBackupTest : public QObject {
         // the pre-restore world was kept aside, not deleted
         const auto entries = QDir(saves).entryList(QDir::Dirs | QDir::NoDotAndDotDot);
         QCOMPARE(entries.size(), 2);
+    }
+
+    void test_restoreWithSymlinkedInstancePath()
+    {
+        QTemporaryDir root;
+        QVERIFY(root.isValid());
+
+        const QString realInstance = FS::PathCombine(root.path(), "instance-real");
+        const QString linkedInstance = FS::PathCombine(root.path(), "instance-link");
+        QVERIFY(QDir().mkpath(realInstance));
+
+        std::error_code ec;
+        std::filesystem::create_directory_symlink(realInstance.toStdString(), linkedInstance.toStdString(), ec);
+        if (ec) {
+            QSKIP(qPrintable(QString("Could not create test symlink: %1").arg(QString::fromStdString(ec.message()))));
+        }
+
+        const QString saves = FS::PathCombine(linkedInstance, "saves");
+        const QString world = FS::PathCombine(saves, "My World");
+        QVERIFY(QDir().mkpath(FS::PathCombine(world, "region")));
+        writeFile(FS::PathCombine(world, "level.dat"), "original");
+        writeFile(FS::PathCombine(world, "region", "r.0.0.mca"), "blocks");
+
+        QString error;
+        QVERIFY2(!WorldBackup::backupWorld(world, linkedInstance, 2, &error).isEmpty(), qPrintable(error));
+
+        const auto backup = WorldBackup::listBackups(linkedInstance, "My World").first().absoluteFilePath();
+        writeFile(FS::PathCombine(world, "level.dat"), "griefed");
+        QVERIFY2(WorldBackup::restoreBackup(backup, saves, "My World", &error), qPrintable(error));
+
+        QFile restored(FS::PathCombine(world, "level.dat"));
+        QVERIFY(restored.open(QIODevice::ReadOnly));
+        QCOMPARE(restored.readAll(), QByteArray("original"));
     }
 };
 

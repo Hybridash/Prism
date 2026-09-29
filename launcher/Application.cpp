@@ -66,6 +66,7 @@
 #include "ui/pages/global/LauncherPage.h"
 #include "ui/pages/global/MinecraftPage.h"
 #include "ui/pages/global/ProxyPage.h"
+#include "ui/pages/global/HybridPage.h"
 
 #include "ui/setupwizard/AutoJavaWizardPage.h"
 #include "ui/setupwizard/JavaWizardPage.h"
@@ -901,6 +902,14 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv)
         m_settings->registerSetting("CloseAfterLaunch", false);
         m_settings->registerSetting("QuitAfterGameStop", false);
 
+        // Hybrid Launcher features
+        m_settings->registerSetting("HybridWorldBackups", true);
+        m_settings->registerSetting("HybridWorldBackupsKeep", 5);
+        m_settings->registerSetting("HybridCrashExplainer", true);
+        m_settings->registerSetting("HybridModChecker", true);
+        m_settings->registerSetting("HybridMemoryAdvice", true);
+        m_settings->registerSetting("HybridSyncSharedConfig", false);
+
         m_settings->registerSetting("Env", "{}");
 
         m_settings->registerSetting("WorldTools", "{}");
@@ -933,6 +942,7 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv)
             m_globalSettingsProvider->addPage<APIPage>();
             m_globalSettingsProvider->addPage<ExternalToolsPage>();
             m_globalSettingsProvider->addPage<ProxyPage>();
+            m_globalSettingsProvider->addPage<HybridPage>();
         }
 
         PixmapCache::setInstance(new PixmapCache(this));

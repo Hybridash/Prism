@@ -269,6 +269,20 @@ set(MINECRAFT_SOURCES
     minecraft/launch/ReconstructAssets.h
     minecraft/launch/ScanModFolders.cpp
     minecraft/launch/ScanModFolders.h
+    minecraft/launch/BackupWorlds.cpp
+    minecraft/launch/BackupWorlds.h
+    minecraft/launch/CheckModConflicts.cpp
+    minecraft/launch/CheckModConflicts.h
+    minecraft/launch/RecommendMemory.cpp
+    minecraft/launch/RecommendMemory.h
+    minecraft/launch/SyncSharedConfig.cpp
+    minecraft/launch/SyncSharedConfig.h
+
+    # Hybrid Launcher helpers
+    hybrid/CrashExplainer.cpp
+    hybrid/CrashExplainer.h
+    hybrid/WorldBackup.cpp
+    hybrid/WorldBackup.h
     minecraft/launch/VerifyJavaInstall.cpp
     minecraft/launch/VerifyJavaInstall.h
     minecraft/launch/AutoInstallJava.cpp
@@ -931,6 +945,8 @@ SET(LAUNCHER_SOURCES
     ui/pages/global/JavaPage.h
     ui/pages/global/LanguagePage.cpp
     ui/pages/global/LanguagePage.h
+    ui/pages/global/HybridPage.cpp
+    ui/pages/global/HybridPage.h
     ui/pages/global/MinecraftPage.h
     ui/pages/global/LauncherPage.cpp
     ui/pages/global/LauncherPage.h

@@ -67,6 +67,10 @@
 #include "minecraft/launch/PrintInstanceInfo.h"
 #include "minecraft/launch/ReconstructAssets.h"
 #include "minecraft/launch/ScanModFolders.h"
+#include "minecraft/launch/BackupWorlds.h"
+#include "minecraft/launch/CheckModConflicts.h"
+#include "minecraft/launch/RecommendMemory.h"
+#include "minecraft/launch/SyncSharedConfig.h"
 #include "minecraft/launch/VerifyJavaInstall.h"
 
 #include "minecraft/update/AssetUpdateTask.h"
@@ -1239,6 +1243,12 @@ LaunchTask* MinecraftInstance::createLaunchTask(AuthSessionPtr session, Minecraf
         process->appendStep(makeShared<ScanModFolders>(pptr));
     }
 
+    // Hybrid Launcher: warn about duplicate / clashing / missing mods, and suggest a RAM setting
+    {
+        process->appendStep(makeShared<CheckModConflicts>(pptr, this));
+        process->appendStep(makeShared<RecommendMemory>(pptr, this));
+    }
+
     // make sure we have enough RAM, warn the user if we don't
     {
         process->appendStep(makeShared<EnsureAvailableMemory>(pptr, this));
@@ -1259,6 +1269,12 @@ LaunchTask* MinecraftInstance::createLaunchTask(AuthSessionPtr session, Minecraf
         process->appendStep(makeShared<ReconstructAssets>(pptr));
     }
 
+    // Hybrid Launcher: back up worlds and apply shared keybinds/servers while the game isn't running yet
+    {
+        process->appendStep(makeShared<BackupWorlds>(pptr, this));
+        process->appendStep(makeShared<SyncSharedConfig>(pptr, this, SyncSharedConfig::Direction::Pull));
+    }
+
     {
         // actually launch the game
         auto step = makeShared<LauncherPartLaunch>(pptr);
@@ -1266,6 +1282,11 @@ LaunchTask* MinecraftInstance::createLaunchTask(AuthSessionPtr session, Minecraf
         step->setAuthSession(session);
         step->setTargetToJoin(targetToJoin);
         process->appendStep(step);
+    }
+
+    // Hybrid Launcher: save this instance's keybinds/servers for the others after the game closes
+    {
+        process->appendStep(makeShared<SyncSharedConfig>(pptr, this, SyncSharedConfig::Direction::Push));
     }
 
     // run post-exit command if that's needed

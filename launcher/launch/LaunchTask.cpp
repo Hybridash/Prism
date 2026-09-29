@@ -43,7 +43,10 @@
 #include <QDir>
 #include <QStandardPaths>
 #include <variant>
+#include "Application.h"
 #include "Commandline.h"
+#include "hybrid/CrashExplainer.h"
+#include "settings/SettingsObject.h"
 #include "MessageLevel.h"
 #include "tasks/Task.h"
 
@@ -297,6 +300,13 @@ void LaunchTask::emitSucceeded()
 
 void LaunchTask::emitFailed(QString reason)
 {
+    // Hybrid Launcher: explain the crash in plain English at the end of the log
+    if (m_logModel && APPLICATION->settings()->get("HybridCrashExplainer").toBool()) {
+        const auto explanation = CrashExplainer::explain(m_logModel->toPlainText());
+        for (const auto& line : explanation) {
+            m_logModel->append(MessageLevel::Launcher, line);
+        }
+    }
     m_instance->setRunning(false);
     m_instance->setCrashed(true);
     Task::emitFailed(reason);

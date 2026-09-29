@@ -50,6 +50,7 @@
 #include <QDialogButtonBox>
 #include <QEvent>
 #include <QInputDialog>
+#include <QGuiApplication>
 #include <QKeyEvent>
 #include <QMenu>
 #include <QMessageBox>
@@ -68,6 +69,7 @@
 
 #include "Application.h"
 #include "DataPackPage.h"
+#include "hybrid/WorldBackup.h"
 #include "settings/Setting.h"
 
 namespace {
@@ -102,6 +104,16 @@ WorldListPage::WorldListPage(MinecraftInstance* inst, WorldList* worlds, QWidget
     m_ui->setupUi(this);
 
     m_ui->toolBar->insertSpacer(m_ui->actionRefresh);
+
+    // Hybrid Launcher: world backups
+    m_backupNow = new QAction(tr("Back Up Now"), this);
+    m_backupNow->setToolTip(tr("Save a backup of the selected world right now."));
+    m_restoreBackup = new QAction(tr("Restore Backup..."), this);
+    m_restoreBackup->setToolTip(tr("Replace the selected world with one of its backups. The current version is kept as a copy."));
+    m_ui->toolBar->insertAction(m_ui->actionReset_Icon, m_backupNow);
+    m_ui->toolBar->insertAction(m_ui->actionReset_Icon, m_restoreBackup);
+    connect(m_backupNow, &QAction::triggered, this, &WorldListPage::backupSelectedWorld);
+    connect(m_restoreBackup, &QAction::triggered, this, &WorldListPage::restoreSelectedWorld);
 
     auto* proxy = new WorldListProxyModel(this);
     proxy->setSortCaseSensitivity(Qt::CaseInsensitive);
@@ -397,6 +409,10 @@ void WorldListPage::worldChanged([[maybe_unused]] const QModelIndex& current, [[
     m_ui->actionRename->setEnabled(enable);
     m_ui->actionData_Packs->setEnabled(enable);
     m_ui->actionWorldTools->setEnabled(enable);
+    if (m_backupNow) {
+        m_backupNow->setEnabled(enable);
+        m_restoreBackup->setEnabled(enable);
+    }
     bool hasIcon = !index.data(WorldList::IconFileRole).isNull();
     m_ui->actionReset_Icon->setEnabled(enable && hasIcon);
 
@@ -515,6 +531,79 @@ void WorldListPage::on_actionJoin_triggered()
     auto worldVariant = m_worlds->data(index, WorldList::ObjectRole);
     auto* world = static_cast<World*>(worldVariant.value<void*>());
     APPLICATION->launch(m_inst, LaunchMode::Normal, std::make_shared<MinecraftTarget>(MinecraftTarget::parse(world->folderName(), true)));
+}
+
+void WorldListPage::backupSelectedWorld()
+{
+    const QModelIndex index = getSelectedWorld();
+    if (!index.isValid()) {
+        return;
+    }
+    const auto folder = m_worlds->data(index, WorldList::FolderRole).toString();
+    const int keep = std::max(1, APPLICATION->settings()->get("HybridWorldBackupsKeep").toInt());
+
+    QString error;
+    QGuiApplication::setOverrideCursor(Qt::WaitCursor);
+    const auto zip = WorldBackup::backupWorld(folder, m_inst->instanceRoot(), keep, &error);
+    QGuiApplication::restoreOverrideCursor();
+
+    if (zip.isEmpty()) {
+        QMessageBox::warning(this, tr("Backup failed"), error);
+    } else {
+        QMessageBox::information(this, tr("Backup saved"),
+                                 tr("Saved %1.\nThe newest %2 backups of each world are kept.").arg(QFileInfo(zip).fileName()).arg(keep));
+    }
+}
+
+void WorldListPage::restoreSelectedWorld()
+{
+    const QModelIndex index = getSelectedWorld();
+    if (!index.isValid()) {
+        return;
+    }
+    if (m_inst->isRunning()) {
+        QMessageBox::warning(this, tr("Restore Backup"), tr("Close the game before restoring a world."));
+        return;
+    }
+
+    const auto folder = QFileInfo(m_worlds->data(index, WorldList::FolderRole).toString()).fileName();
+    const auto backups = WorldBackup::listBackups(m_inst->instanceRoot(), folder);
+    if (backups.isEmpty()) {
+        QMessageBox::information(this, tr("Restore Backup"),
+                                 tr("This world has no backups yet. Backups are made when you launch the game, or with \"Back Up Now\"."));
+        return;
+    }
+
+    QStringList choices;
+    for (const auto& backup : backups) {
+        choices << QLocale().toString(backup.lastModified(), QLocale::LongFormat);
+    }
+    bool ok = false;
+    const auto choice = QInputDialog::getItem(this, tr("Restore Backup"), tr("Restore \"%1\" to how it was on:").arg(folder), choices, 0, false, &ok);
+    if (!ok) {
+        return;
+    }
+    const auto& backup = backups.at(choices.indexOf(choice));
+
+    const auto answer = QMessageBox::question(
+        this, tr("Restore Backup"),
+        tr("Replace \"%1\" with the backup from %2?\n\nThe current world is not deleted: it is kept as a copy named \"%1 (before restore ...)\".")
+            .arg(folder, choice));
+    if (answer != QMessageBox::Yes) {
+        return;
+    }
+
+    QString error;
+    m_worlds->stopWatching();
+    QGuiApplication::setOverrideCursor(Qt::WaitCursor);
+    const bool restored = WorldBackup::restoreBackup(backup.absoluteFilePath(), m_worlds->dir().absolutePath(), folder, &error);
+    QGuiApplication::restoreOverrideCursor();
+    m_worlds->startWatching();
+    m_worlds->update();
+
+    if (!restored) {
+        QMessageBox::warning(this, tr("Restore failed"), error);
+    }
 }
 
 #include "WorldListPage.moc"

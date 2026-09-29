@@ -82,6 +82,8 @@ class WorldListPage : public QMainWindow, public BasePage {
     Ui::WorldListPage* m_ui;
     WorldList* m_worlds;
     QMenu* m_worldToolsMenu = nullptr;
+    QAction* m_backupNow = nullptr;
+    QAction* m_restoreBackup = nullptr;
 
     std::unique_ptr<DataPackFolderModel> m_datapackModel;
 
@@ -97,6 +99,8 @@ class WorldListPage : public QMainWindow, public BasePage {
     void on_actionReset_Icon_triggered();
     void worldChanged(const QModelIndex& current, const QModelIndex& previous);
     void on_actionJoin_triggered();
+    void backupSelectedWorld();
+    void restoreSelectedWorld();
 
     void ShowContextMenu(const QPoint& pos);
 };
